@@ -18,7 +18,8 @@
     "resolveJsonModule": true,
 
     "incremental": true,
-    "strict": false
+    "strict": false,
+    "declaration": true
   },
   "compileOnSave": true,
   "include": ["src/**.ts"],
