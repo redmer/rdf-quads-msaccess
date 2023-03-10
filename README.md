@@ -4,7 +4,7 @@
 
 This library and CLI creates RDF quads from a Microsoft Access database (`.accdb` or `.mdb`).
 
-Read the [introductory blog post][https://rdmr.eu/2023/msaccess] or go directly to [NPM](https://www.npmjs.com/package/@rdmr-eu/rdfjs-source-msaccess/access).
+Read the [introductory blog post](https://rdmr.eu/2023/msaccess) or go directly to [NPM](https://www.npmjs.com/package/@rdmr-eu/rdfjs-source-msaccess/access).
 
 ## Usage
 
