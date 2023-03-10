@@ -9,7 +9,7 @@
   "private": false,
   "bin": "dist/cli.js",
   "scripts": {
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "build": "tsc -p ./tsconfig.json",
     "watch": "tsc --watch -p ./tsconfig.json",
     "lint": "cross-env ESLINT_STRICT=true ESLINT_EXPENSIVE=true eslint . --ext .ts",
