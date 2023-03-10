@@ -1,6 +1,10 @@
 # `rdfjs-source-msaccess`
 
+![NPM](https://img.shields.io/npm/v/@rdmr-eu/rdfjs-source-msaccess)
+
 This library and CLI creates RDF quads from a Microsoft Access database (`.accdb` or `.mdb`).
+
+Read the [introductory blog post][https://rdmr.eu/2023/msaccess] or go directly to [NPM](https://www.npmjs.com/package/@rdmr-eu/rdfjs-source-msaccess/access).
 
 ## Usage
 
@@ -10,7 +14,7 @@ Add it as a library with e.g. `$ yarn add @rdmr-eu/rdfjs-source-msaccess` and us
 
 ```ts
 const data = fs.readFileSync(inputFilePath);
-const mdb = new MSAccessQuadGenerator(data, { baseIRI: "https://example.org/data#" });
+const mdb = new MSAccess(data, { baseIRI: "https://example.org/data#" });
 const store = mdb.store(); // then use this RDF.Store in your code.
 ```
 
