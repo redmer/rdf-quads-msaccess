@@ -2,7 +2,7 @@
   "name": "@rdmr-eu/rdfjs-source-msaccess",
   "version": "1.0.4",
   "description": "Generate RDF quads from a Microsoft Access database.",
-  "main": "dist/cli.js",
+  "main": "dist/msaccess.js",
   "repository": "https://github.com/redmer/rdfjs-source-msaccess.git",
   "author": "Redmer Kronemeijer <12477216+redmer@users.noreply.github.com> (https://rdmr.eu/)",
   "license": "MPL-2.0",
