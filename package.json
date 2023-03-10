@@ -21,7 +21,7 @@
   "files": [
     "dist/**"
   ],
-  "types": "dist",
+  "types": "dist/msaccess.d.ts",
   "type": "module",
   "devDependencies": {
     "@types/n3": "^1.10.4",
