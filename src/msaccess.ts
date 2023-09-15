@@ -3,6 +3,9 @@ import MDBReader, { Options as MDBOptions } from "mdb-reader";
 import { ColumnType } from "mdb-reader/lib/node/types.js";
 import type { Value } from "mdb-reader/lib/types/types.js";
 import N3 from "n3";
+import { readFileSync } from "node:fs";
+import { Readable } from "node:stream";
+import { pathToFileURL } from "node:url";
 import { CSVNS, FX, RDFNS, XSD, XYZ } from "./prefixes.js";
 
 /** Configuration options. */
@@ -20,25 +23,51 @@ export interface MSAccessConstructorOptions extends MDBOptions {
   dataFactory: RDF.DataFactory;
 }
 
-/** A Microsoft Access (.accdb/.mdb) database that is a source of RDF quads. */
-export class MSAccess implements RDF.Source {
+export class MSAccess extends Readable implements RDF.Stream {
   #db: MDBReader;
   #quadMode: MSAccessConstructorOptions["quadMode"];
   #baseURI: string;
   #df: RDF.DataFactory;
-  #store: N3.Store;
+  shouldRead: boolean;
+  iterQuad: Generator<RDF.Quad, any, unknown>;
 
-  /** Initialize the quad generator. */
-  constructor(database: Buffer, options?: Partial<MSAccessConstructorOptions>) {
-    this.#db = new MDBReader(database, options);
+  /**
+   * Read a Microsoft Access (.accdb/.mdb) database and stream RDF quads
+   * @param database Filepath to or Buffer of the database
+   * @param options Options
+   */
+  constructor(database: string | Buffer, options: Partial<MSAccessConstructorOptions>) {
+    super({ objectMode: true });
+
+    const buffer = database instanceof Buffer ? database : readFileSync(database);
+    this.#db = new MDBReader(buffer, options);
 
     // The data factory argument is required by RDF-JS
     this.#df = options.dataFactory ?? N3.DataFactory;
-    this.#store = new N3.Store(undefined, { factory: this.#df });
 
     // Default mode is facade-x
     this.#quadMode = options.quadMode ?? "facade-x";
-    this.#baseURI = options.baseIRI ?? "http://example.org/data#";
+    this.#baseURI =
+      options.baseIRI ?? database instanceof Buffer
+        ? "http://example.org/data#"
+        : pathToFileURL(database).href;
+  }
+
+  _construct(callback: (error?: Error) => void): void {
+    this.iterQuad = this.quads();
+    callback();
+  }
+
+  _read(size: number): void {
+    this.shouldRead = true;
+    let shouldContinue: boolean;
+
+    while (this.shouldRead) {
+      const iter = this.iterQuad.next();
+      if (iter.value) shouldContinue = this.push(iter.value);
+      if (iter.done) this.push(null); // EOF = push null chunk
+      this.shouldRead = shouldContinue;
+    }
   }
 
   /** Generate quads. */
@@ -54,21 +83,9 @@ export class MSAccess implements RDF.Source {
 
   /** Generate quads and store them in a RDF-JS Store (cached). */
   store(): RDF.Store {
-    if (this.#store.size) return this.#store;
-    for (const quad of this.quads()) this.#store.addQuad(quad);
-    return this.#store;
-  }
-
-  /** Implement the RDF-JS Source interface and match quads selectively (cached). */
-  match(
-    subject?: RDF.Term,
-    predicate?: RDF.Term,
-    object?: RDF.Term,
-    graph?: RDF.Term
-  ): RDF.Stream<RDF.Quad> {
-    // TODO: This isn't really streaming...
-    const store = this.store();
-    return store.match(subject, predicate, object, graph);
+    const store = new N3.Store();
+    store.import(this);
+    return store;
   }
 
   /** Generate quads with a model akin to Facade-X. */
