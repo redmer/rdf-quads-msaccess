@@ -17,6 +17,13 @@ export interface MSAccessConstructorOptions extends MDBOptions {
    * `"csv"` generates a quad per table per column per row value.
    */
   quadMode: "facade-x" | "csv";
+  /**
+   * Datatypes can simplify querying.
+   *
+   * `"original"` (default) are most similar to the Access column datatypes
+   * `"easy-sparql"`: maps to xsd:integer, xsd:decimal (with .) and xsd:double (with E)
+   */
+  datatypeMode: "original" | "easy-sparql";
   /** Base URI, required for the Façade-X ontology. */
   baseIRI: string;
   /** Used to create all the data model instances */
@@ -26,6 +33,7 @@ export interface MSAccessConstructorOptions extends MDBOptions {
 export class MSAccess extends Readable implements RDF.Stream {
   #db: MDBReader;
   #quadMode: MSAccessConstructorOptions["quadMode"];
+  #datatypeMode: MSAccessConstructorOptions["datatypeMode"];
   #baseURI: string;
   #df: RDF.DataFactory;
   shouldRead: boolean;
@@ -47,6 +55,7 @@ export class MSAccess extends Readable implements RDF.Stream {
 
     // Default mode is facade-x
     this.#quadMode = options.quadMode ?? "facade-x";
+    this.#datatypeMode = options.datatypeMode ?? "original";
     this.#baseURI =
       options.baseIRI ?? database instanceof Buffer
         ? "http://example.org/data#"
@@ -90,6 +99,8 @@ export class MSAccess extends Readable implements RDF.Stream {
 
   /** Generate quads with a model akin to Facade-X. */
   private *facadeXQuads() {
+    const valueFunc = this.#datatypeMode == "original" ? this.originalValue : this.easySparqlValue;
+
     const TABLE = this.#baseURI;
 
     for (const tableName of this.#db.getTableNames()) {
@@ -111,7 +122,7 @@ export class MSAccess extends Readable implements RDF.Stream {
           const columnType = tableData.getColumn(column).type;
 
           const predicate = XYZ(encodeURI(column));
-          const object = this.mdbValueToObject(value, columnType);
+          const object = this.mdbValueToObject(value, columnType, valueFunc);
 
           yield this.#df.quad(row, predicate, object, graph);
         }
@@ -122,6 +133,8 @@ export class MSAccess extends Readable implements RDF.Stream {
 
   /** Generate <csv:> quads. */
   private *csvQuads() {
+    const valueFunc = this.#datatypeMode == "original" ? this.originalValue : this.easySparqlValue;
+
     for (const tableName of this.#db.getTableNames()) {
       const table = this.#db.getTable(tableName);
       // Each table is a used as a graph
@@ -137,7 +150,7 @@ export class MSAccess extends Readable implements RDF.Stream {
 
           const subject = CSVNS(`table/${encodeURI(tableName)}/row/${i_row}`);
           const predicate = CSVNS(encodeURI(column));
-          const object = this.mdbValueToObject(value, columnType);
+          const object = this.mdbValueToObject(value, columnType, valueFunc);
 
           yield this.#df.quad(subject, predicate, object, context);
         }
@@ -146,9 +159,38 @@ export class MSAccess extends Readable implements RDF.Stream {
     }
   }
 
+  private easySparqlValue(value: Value, columnType: ColumnType): [string, N3.NamedNode] {
+    const conv: Record<ColumnType, (v: Value) => [string, N3.NamedNode]> = {
+      [ColumnType.Binary]: (v: Buffer) => [v.toString("base64"), XSD("base64Binary")],
+      [ColumnType.OLE]: (v: Buffer) => [v.toString("base64"), XSD("base64Binary")],
+
+      [ColumnType.Boolean]: (v: boolean) => [v ? "true" : "false", XSD("boolean")],
+
+      [ColumnType.DateTime]: (v: Date) => [v.toISOString(), XSD("dateTime")],
+
+      [ColumnType.Double]: (v: number) => [v.toString(), XSD("double")],
+
+      [ColumnType.Float]: (v: number) => [v.toString(), XSD("decimal")],
+
+      [ColumnType.BigInt]: (v: bigint) => [v.toString(), XSD("integer")],
+      [ColumnType.Byte]: (v: number) => [v.toString(), XSD("integer")],
+      [ColumnType.Integer]: (v: number) => [v.toFixed(0), XSD("integer")],
+      [ColumnType.Complex]: (v: number) => [v.toString(), XSD("integer")],
+      [ColumnType.Long]: (v: number) => [v.toFixed(0), XSD("integer")],
+
+      [ColumnType.Currency]: (v: string) => [v, XSD("string")],
+      [ColumnType.DateTimeExtended]: (v: string) => [v, XSD("string")],
+      [ColumnType.Memo]: (v: string) => [v, XSD("string")],
+      [ColumnType.Numeric]: (v: string) => [v, XSD("string")],
+      [ColumnType.RepID]: (v: string) => [v, XSD("string")],
+      [ColumnType.Text]: (v: string) => [v, XSD("string")],
+    };
+    return conv[columnType](value);
+  }
+
   /** Convert a MDB value to a RDF value with a specific datatype */
-  mdbValueToObject(value: Value, columnType: ColumnType): RDF.Literal {
-    // TODO: Not all datatypes have been checked with what Access produces
+  private originalValue(value: Value, columnType: ColumnType): [string, N3.NamedNode] {
+    // Alphabetical order, ColumnTypes from mdb-reader
     const conv: Record<ColumnType, (v: Value) => [string, N3.NamedNode]> = {
       [ColumnType.BigInt]: (v: bigint) => [v.toString(), XSD("integer")],
       [ColumnType.Binary]: (v: Buffer) => [v.toString("base64"), XSD("base64Binary")],
@@ -168,9 +210,17 @@ export class MSAccess extends Readable implements RDF.Stream {
       [ColumnType.RepID]: (v: string) => [v, XSD("string")],
       [ColumnType.Text]: (v: string) => [v, XSD("string")],
     };
+    return conv[columnType](value);
+  }
 
+  mdbValueToObject(
+    value: Value,
+    columnType: ColumnType,
+    valueFunc: (value: Value, columnType: ColumnType) => [string, N3.NamedNode] | undefined
+  ): RDF.Literal {
+    valueFunc = valueFunc ?? this.originalValue;
     try {
-      const [nativeValue, languageOrDatatype] = conv[columnType](value);
+      const [nativeValue, languageOrDatatype] = valueFunc(columnType, value);
       return this.#df.literal(nativeValue, languageOrDatatype);
     } catch (e) {
       return this.#df.literal(value as string);

@@ -23,6 +23,10 @@ export async function cli() {
     .choices("mode", ["facade-x", "csv"])
     .option("base", { description: "Base IRI for the Facade-X generated data" })
     .alias("base", "base-iri")
+    .option("datatypes", { desc: "Change column datatypes for easier SPARQL", type: "string" })
+    .choices("datatypes", ["original", "easy-sparql"])
+    .default("datatypes", "original")
+    .strictOptions()
     .help()
     .parse();
 
@@ -36,6 +40,7 @@ export async function cli() {
     password: argv.password as string,
     quadMode: argv.mode as unknown as any,
     baseIRI: (argv.base as string) ?? pathToFileURL(argv.input).href + "#",
+    datatypeMode: argv.datatypes as unknown as any,
   });
   const writer = new N3.StreamWriter({ format: "nquads" });
 
