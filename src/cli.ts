@@ -27,7 +27,6 @@ export async function cli() {
     .choices("datatypes", ["original", "easy-sparql"])
     .default("datatypes", "original")
     .strictOptions()
-    .help()
     .parse();
 
   const OUT = argv.output
@@ -51,4 +50,4 @@ export async function cli() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) void cli();
+void cli();
