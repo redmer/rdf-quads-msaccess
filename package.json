@@ -3,11 +3,16 @@
   "version": "3.1.0",
   "description": "Generate RDF quads from a Microsoft Access database.",
   "main": "dist/msaccess.js",
-  "repository": "https://github.com/redmer/rdfjs-source-msaccess.git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/redmer/rdfjs-source-msaccess.git"
+  },
   "author": "Redmer Kronemeijer <12477216+redmer@users.noreply.github.com> (https://rdmr.eu/)",
   "license": "MPL-2.0",
   "private": false,
-  "bin": "dist/cli.js",
+  "bin": {
+    "rdfjs-source-msaccess": "dist/cli.js"
+  },
   "scripts": {
     "test": "jest --passWithNoTests",
     "build": "tsc -p ./tsconfig.json",
